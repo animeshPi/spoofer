@@ -2,6 +2,7 @@ mod cli;
 mod devices;
 mod arp_spoof;
 
+use arp_spoof::start_arp_spoofing;
 use devices::{get_linux_gateway_ip, get_network_devices};
 use cli::{get_local_ip, scan_ips, select_ips};
 use std::{io, net::Ipv4Addr};
@@ -55,13 +56,14 @@ fn main() -> io::Result<()> {
         }
     }
 
+    // For parameters in spoof running function
     let gateway_ip = gateway_ip.parse::<Ipv4Addr>().unwrap();
 
     let target_ips: Vec<Ipv4Addr> = selected_targets.iter()
         .map(|&i| ips[i].parse::<Ipv4Addr>().unwrap())
         .collect();
     // Start ARP spoofing
-    match arp_spoof::start_arp_spoofing(selected_interface, target_ips, gateway_ip) {
+    match start_arp_spoofing(selected_interface, target_ips, gateway_ip) {
         Ok(_) => println!("ARP spoofing started successfully."),
         Err(e) => eprintln!("Error starting ARP spoofing: {}", e),
     }
