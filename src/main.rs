@@ -36,11 +36,6 @@ fn main() -> io::Result<()> {
         }
     };
 
-    if ips.is_empty() {
-        println!("No IP addresses found!");
-        return Ok(());
-    }
-
     let gateway_ip = get_linux_gateway_ip(); // Assuming the first IP is the gateway
     // Select IPs through CLI interface
     let selected_indices = select_ips(&ips, &gateway_ip)?;
@@ -49,6 +44,7 @@ fn main() -> io::Result<()> {
     // Handle selected IPs
     if selected_indices.is_empty() {
         println!("No IP addresses selected!");
+        std::process::exit(1);
     } else {
         println!("\nSelected IP addresses:");
         for index in selected_indices {

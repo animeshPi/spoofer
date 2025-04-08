@@ -14,7 +14,7 @@ pub fn select_device(devices: &[String]) -> io::Result<usize> {
     let theme = ColorfulTheme {
         active_item_prefix: Style::new().apply_to("⮚".to_string()),
         inactive_item_prefix: Style::new().apply_to("  ".to_string()),
-        active_item_style: Style::new().yellow().bright(),
+        active_item_style: Style::new().green().bright(),
         inactive_item_style: Style::new().white(),
         ..ColorfulTheme::default()
     };
@@ -87,7 +87,7 @@ pub fn select_ips(ip_addresses: &[String], gateway_ip: &str) -> io::Result<Vec<u
     let theme = ColorfulTheme {
         unchecked_item_prefix: Style::new().apply_to("❏ ".to_string()),
         checked_item_prefix: Style::new().apply_to("🗹".to_string()),
-        active_item_style: Style::new().yellow().bright(),
+        active_item_style: Style::new().green().bright(),
         inactive_item_style: Style::new().white(),
         ..ColorfulTheme::default()
     };
@@ -104,9 +104,13 @@ pub fn select_ips(ip_addresses: &[String], gateway_ip: &str) -> io::Result<Vec<u
     // Print gateway info
     println!("Gateway IP: {}\n", gateway_ip);
 
-    // Show instructions
-    println!("Select IP addresses from the list:");
-    println!("Use SPACE to select, ENTER to confirm, 'a' to toggle all");
+    if display_ips.is_empty() {
+        eprintln!("No IP addresses available to select!");
+        std::process::exit(1);
+    } else {
+        println!("Select IP addresses from the list:");
+        println!("Use SPACE to select, ENTER to confirm, 'a' to toggle all");
+    }
 
     let selected = MultiSelect::with_theme(&theme)
         .with_prompt("Choose IP addresses")

