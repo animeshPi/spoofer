@@ -268,7 +268,7 @@ fn print_statuses(targets: &[Target], first_run: &mut bool) {
     }
     for target in targets {
         let status = if target.active { "  Active" } else { "Inactive" };
-        let symbol = if target.active { "+" } else { "-" };
+        let symbol = if target.active { "+" } else { "!" };
         println!("[{}] Target {:15} : {}", symbol, target.ip, status);
     }
 }

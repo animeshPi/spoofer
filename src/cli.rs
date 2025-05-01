@@ -2,6 +2,7 @@ use dialoguer::{
     theme::ColorfulTheme, 
     MultiSelect, 
     Select,
+    Input,
     console::Style
 };
 use std::io;
@@ -105,8 +106,10 @@ pub fn select_ips(ip_addresses: &[String], gateway_ip: &str) -> io::Result<Vec<u
     println!("Gateway IP: {}\n", gateway_ip);
 
     if display_ips.is_empty() {
-        eprintln!("No IP addresses available to select!");
-        std::process::exit(1);
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            "No IP addresses available to select",
+        ));
     } else {
         println!("Select IP addresses from the list:");
         println!("Use SPACE to select, ENTER to confirm, 'a' to toggle all");
@@ -122,4 +125,15 @@ pub fn select_ips(ip_addresses: &[String], gateway_ip: &str) -> io::Result<Vec<u
     let result: Vec<usize> = selected.iter().map(|&i| filtered[i].0).collect();
 
     Ok(result)
+}
+
+pub fn prompt_retry(prompt: &str) -> io::Result<bool> {
+    let theme = ColorfulTheme::default();
+    let input: String = Input::with_theme(&theme)
+        .with_prompt(format!("{} ", prompt))
+        .allow_empty(true)
+        .interact_text()?;
+
+    Ok(input.to_lowercase().trim().is_empty() || 
+        matches!(input.to_lowercase().as_str(), "y" | "yes"))
 }
