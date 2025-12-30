@@ -1,36 +1,17 @@
 use std::fs;
 use std::io;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-/// RAII guard for Linux IPv4 forwarding
-pub struct IpForwardGuard {
-    original: String,
+static FORWARDING_ENABLED: AtomicBool = AtomicBool::new(false);
+
+pub fn enable_ip_forwarding() -> io::Result<()> {
+    fs::write("/proc/sys/net/ipv4/ip_forward", "1")?;
+    FORWARDING_ENABLED.store(true, Ordering::SeqCst);
+    Ok(())
 }
 
-impl IpForwardGuard {
-    /// Enables IP forwarding and remembers the original value
-    pub fn new() -> io::Result<Self> {
-        let path = "/proc/sys/net/ipv4/ip_forward";
-
-        // Read original state
-        let original = fs::read_to_string(path)?.trim().to_string();
-
-        // Enable forwarding
-        fs::write(path, "1")?;
-
-        println!("IP forwarding enabled");
-
-        Ok(Self { original })
-    }
-}
-
-impl Drop for IpForwardGuard {
-    fn drop(&mut self) {
-        let path = "/proc/sys/net/ipv4/ip_forward";
-
-        if let Err(e) = fs::write(path, &self.original) {
-            eprintln!("Failed to restore IP forwarding state: {}", e);
-        } else {
-            println!("IP forwarding restored to {}", self.original);
-        }
-    }
+pub fn disable_ip_forwarding() -> io::Result<()> {
+    fs::write("/proc/sys/net/ipv4/ip_forward", "0")?;
+    FORWARDING_ENABLED.store(false, Ordering::SeqCst);
+    Ok(())
 }
