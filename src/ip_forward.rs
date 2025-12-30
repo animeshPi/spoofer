@@ -1,17 +1,26 @@
 use std::fs;
 use std::io;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
 
-static FORWARDING_ENABLED: AtomicBool = AtomicBool::new(false);
+static ORIGINAL_STATE: OnceLock<String> = OnceLock::new();
+
+fn read_ip_forward() -> io::Result<String> {
+    Ok(fs::read_to_string("/proc/sys/net/ipv4/ip_forward")?
+        .trim()
+        .to_string())
+}
 
 pub fn enable_ip_forwarding() -> io::Result<()> {
+    let current = read_ip_forward()?;
+    ORIGINAL_STATE.set(current).ok();
+
     fs::write("/proc/sys/net/ipv4/ip_forward", "1")?;
-    FORWARDING_ENABLED.store(true, Ordering::SeqCst);
     Ok(())
 }
 
-pub fn disable_ip_forwarding() -> io::Result<()> {
-    fs::write("/proc/sys/net/ipv4/ip_forward", "0")?;
-    FORWARDING_ENABLED.store(false, Ordering::SeqCst);
+pub fn restore_ip_forwarding() -> io::Result<()> {
+    if let Some(original) = ORIGINAL_STATE.get() {
+        fs::write("/proc/sys/net/ipv4/ip_forward", original)?;
+    }
     Ok(())
 }

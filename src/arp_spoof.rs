@@ -5,6 +5,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 use std::net::{IpAddr, Ipv4Addr};
 
+use crate::ip_forward::restore_ip_forwarding;
+
 #[derive(Clone)]
 pub struct Target {
     pub ip: Ipv4Addr,
@@ -68,6 +70,7 @@ pub fn start_arp_spoofing(interface_name: &str, target_ips: Vec<Ipv4Addr>, gatew
             restore_arp(&mut cap, target.ip, target.gateway_ip, target.mac, target.gateway_mac)
                 .unwrap_or_else(|e| println!("Failed to restore ARP: {}", e));
         }
+        let _ = restore_ip_forwarding();
         process::exit(0);
     }).expect("Error setting Ctrl+C handler");
 

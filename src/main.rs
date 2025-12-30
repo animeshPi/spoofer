@@ -8,10 +8,10 @@ use devices::{get_linux_gateway_ip, get_network_devices};
 use cli::{get_local_ip, prompt_retry, scan_ips, select_ips};
 use std::{io, net::Ipv4Addr};
 
-struct IpForwardGuard;
+pub struct IpForwardGuard;
 
 impl IpForwardGuard {
-    fn new() -> io::Result<Self> {
+    pub fn new() -> io::Result<Self> {
         ip_forward::enable_ip_forwarding()?;
         Ok(Self)
     }
@@ -19,13 +19,14 @@ impl IpForwardGuard {
 
 impl Drop for IpForwardGuard {
     fn drop(&mut self) {
-        let _ = ip_forward::disable_ip_forwarding();
-        eprintln!("IP forwarding disabled (Drop).");
+        let _ = ip_forward::restore_ip_forwarding();
+        eprintln!("IP forwarding restored (Drop).");
     }
 }
 
 fn main() -> io::Result<()> {
     let _ip_guard = IpForwardGuard::new()?;
+
     // Get network devices
     let devices = get_network_devices()?;
     
