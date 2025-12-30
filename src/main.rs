@@ -1,6 +1,7 @@
 mod cli;
 mod devices;
 mod arp_spoof;
+mod ip_forward;
 
 use arp_spoof::start_arp_spoofing;
 use devices::{get_linux_gateway_ip, get_network_devices};
@@ -8,6 +9,7 @@ use cli::{get_local_ip, prompt_retry, scan_ips, select_ips};
 use std::{io, net::Ipv4Addr};
 
 fn main() -> io::Result<()> {
+    let _ip_forward_guard = ip_forward::IpForwardGuard::new()?;
     // Get network devices
     let devices = get_network_devices()?;
     
