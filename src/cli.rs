@@ -6,6 +6,7 @@ use dialoguer::{
     console::Style
 };
 use std::io;
+use std::net::Ipv4Addr;
 use std::process::Command;
 use std::str;
 use regex::Regex;
@@ -136,4 +137,35 @@ pub fn prompt_retry(prompt: &str) -> io::Result<bool> {
 
     Ok(input.to_lowercase().trim().is_empty() || 
         matches!(input.to_lowercase().as_str(), "y" | "yes"))
+}
+
+pub fn prompt_dns_spoof() -> io::Result<bool> {
+    let theme = ColorfulTheme::default();
+    let input: String = Input::with_theme(&theme)
+        .with_prompt("Enable DNS spoofing? (y/N)")
+        .allow_empty(true)
+        .default("N".to_string())
+        .interact_text()?;
+    Ok(matches!(input.to_lowercase().as_str(), "y" | "yes"))
+}
+
+pub fn prompt_dns_domain() -> io::Result<String> {
+    let theme = ColorfulTheme::default();
+    let domain: String = Input::with_theme(&theme)
+        .with_prompt("Enter domain to spoof (e.g., example.com)")
+        .interact_text()?;
+    Ok(domain)
+}
+
+pub fn prompt_redirect_ip() -> io::Result<Ipv4Addr> {
+    let theme = ColorfulTheme::default();
+    loop {
+        let input: String = Input::with_theme(&theme)
+            .with_prompt("Enter redirect IP address")
+            .interact_text()?;
+        match input.parse::<Ipv4Addr>() {
+            Ok(ip) => return Ok(ip),
+            Err(_) => eprintln!("Invalid IP address. Try again."),
+        }
+    }
 }

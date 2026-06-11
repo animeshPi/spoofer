@@ -2,10 +2,12 @@ mod cli;
 mod devices;
 mod arp_spoof;
 mod ip_forward;
+mod dns_spoof;
 
-use arp_spoof::start_arp_spoofing;
+use arp_spoof::{get_interface_mac, start_arp_spoofing};
 use devices::{get_linux_gateway_ip, get_network_devices};
-use cli::{get_local_ip, prompt_retry, scan_ips, select_ips};
+use cli::{get_local_ip, prompt_dns_domain, prompt_dns_spoof, prompt_redirect_ip, prompt_retry, scan_ips, select_ips};
+use dns_spoof::DnsSpoofConfig;
 use std::{io, net::Ipv4Addr};
 
 pub struct IpForwardGuard;
@@ -94,10 +96,21 @@ fn main() -> io::Result<()> {
         .map(|&i| ips[i].parse().unwrap())
         .collect();
 
-    // Start ARP spoofing
-    match start_arp_spoofing(selected_interface, target_ips, gateway_ip) {
-        Ok(_) => println!("ARP spoofing started successfully."),
-        Err(e) => eprintln!("Error starting ARP spoofing: {}", e),
+    // DNS spoofing setup
+    let dns_config = if prompt_dns_spoof()? {
+        let domain = prompt_dns_domain()?;
+        let redirect_ip = prompt_redirect_ip()?;
+        let our_mac = get_interface_mac(selected_interface)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        Some(DnsSpoofConfig { domain, redirect_ip, our_mac })
+    } else {
+        None
+    };
+
+    // Start ARP spoofing (with optional DNS spoofing)
+    match start_arp_spoofing(selected_interface, target_ips, gateway_ip, dns_config) {
+        Ok(_) => println!("ARP spoofing finished."),
+        Err(e) => eprintln!("Error: {}", e),
     }
 
     Ok(())

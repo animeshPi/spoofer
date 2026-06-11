@@ -9,6 +9,7 @@ Spoofer is a small Rust-based network tooling utility that performs ARP spoofing
 - Pick one or more targets interactively (gateway is excluded automatically).
 - Start ARP spoofing with continuous ARP replies and basic live-status reporting.
 - Automatically enable IP forwarding while running and restore the previous setting on exit.
+- **DNS spoofing** — Optionally intercept DNS A-record queries for a specified domain and inject forged responses with a custom redirect IP.
 
 ## Important Safety & Legal Notice
 
@@ -62,8 +63,9 @@ Program flow (interactive):
 2. The tool determines the local IP and gateway IP.
 3. The tool runs `arp-scan` on the selected interface to find hosts on the LAN.
 4. Pick one or more IP addresses to target (gateway will be shown but excluded from selection).
-5. The tool enables IP forwarding, starts ARP spoofing threads, and shows live target statuses.
-6. Press `Ctrl+C` to stop — the program attempts to restore ARP tables and the original IP forwarding state.
+5. Optionally enable DNS spoofing — enter a domain to intercept and a redirect IP address.
+6. The tool enables IP forwarding, starts ARP spoofing threads, and shows live target statuses.
+7. Press `Ctrl+C` to stop — the program attempts to restore ARP tables and the original IP forwarding state.
 
 See the main program flow in [src/main.rs](src/main.rs#L1-L200) and the ARP engine in [src/arp_spoof.rs](src/arp_spoof.rs#L1-L400).
 
@@ -110,6 +112,7 @@ This project is licensed under the MIT License. See the `LICENSE` file at the pr
 - Main program flow: [src/main.rs](src/main.rs#L1-L200)
 - CLI and interactive helpers: [src/cli.rs](src/cli.rs#L1-L200)
 - ARP spoof engine: [src/arp_spoof.rs](src/arp_spoof.rs#L1-L400)
+- DNS spoof engine: [src/dns_spoof.rs](src/dns_spoof.rs#L1-L200)
 - Device detection: [src/devices.rs](src/devices.rs#L1-L200)
 - IP forwarding helper: [src/ip_forward.rs](src/ip_forward.rs#L1-L200)
 
